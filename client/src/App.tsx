@@ -5,19 +5,24 @@ import {useQuery, useQueryClient} from "react-query";
 import {toast} from "react-toastify";
 import * as yup from "yup"
 import {UserModel} from "./models";
-import {createUser, deleteUser, getUsers} from "./requests";
+import {createUser, deleteUser, getUsers, updateUser} from "./requests";
 import {Modal} from "react-bootstrap";
 
 function App() {
     const queryClient = useQueryClient()
 
+    const [searchFilters, setSearchFilters] = useState<{ name: string, age: string, email: string }>({
+        name: '', age: '', email: ''
+    })
     const [isCreateUserFormShown, setIsCreateUserFormShown] = useState<boolean>(false)
     const [modalFormEdition, setModalFormEdition] = useState<{ isShown: boolean, user: UserModel | null }>({
         isShown: false,
         user: null
     })
+    const [formSearchUserShown, setFormSearchUserShown] = useState<boolean>(false)
 
-    const getUsersQuery = useQuery<UserModel[], AxiosError>('getUsers', () => getUsers().then(r => r.data))
+
+    const getUsersQuery = useQuery<UserModel[], AxiosError>(['getUsers', searchFilters], () => getUsers(searchFilters).then(r => r.data))
 
     function FormCreateNewUser() {
         const validationSchema = yup.object({
@@ -209,7 +214,7 @@ function App() {
         </>
     }
 
-    function FormEditUserInModal() {
+    function FormUpdateUserInModal() {
         const validationSchema = yup.object({
             name: yup.string().required('Name is required'),
             age: yup.number().required("Age is required"),
@@ -228,16 +233,20 @@ function App() {
                     validationSchema={validationSchema}
                     onSubmit={(values, {setStatus, setSubmitting}) => {
                         setTimeout(() => {
-                            createUser({name: values.name as string, age: values.age as number, email: values.email as string}).then(r => {
+                            updateUser(modalFormEdition.user!._id, {name: values.name as string, age: values.age as number, email: values.email as string}).then(r => {
                                 queryClient.setQueryData('getUsers', (list: UserModel[] | undefined) => {
                                     if (list) {
-                                        return [r.data, ...list]
+                                        console.log(list[list.findIndex(item => item._id == modalFormEdition.user!._id)])
+                                        list[list.findIndex(item => item._id == modalFormEdition.user!._id)] = r.data
+                                        console.log(list[list.findIndex(item => item._id == modalFormEdition.user!._id)])
+
+                                        return list
                                     }
                                     return []
                                 })
 
                                 setSubmitting(false)
-                                setIsCreateUserFormShown(false)
+                                setModalFormEdition(prev => ({...prev, isShown: false}))
                             }).catch(() => {
                                 setStatus('Something went wrong ...')
                                 setSubmitting(false)
@@ -297,6 +306,84 @@ function App() {
         </Modal>
     }
 
+    function FormSearchUser() {
+        const validationSchema = yup.object({
+            name: yup.string(),
+            age: yup.number(),
+            email: yup.string().email(),
+        })
+
+        return <Formik
+            initialValues={searchFilters}
+            validationSchema={validationSchema}
+            onSubmit={(values, {setStatus, setSubmitting}) => {
+                setSearchFilters(prev => {
+                    return {
+                        name: values.name || '',
+                        age: values.age || '',
+                        email: values.email || ''
+                    }
+                })
+            }}
+        >
+            {formik => {
+                const {values, errors, setFieldValue, status, isSubmitting, submitForm} = formik
+                return <Form autoComplete="off">
+                    {status && <div className="alert alert-danger" role="alert">{status}</div>}
+
+                    <div className="row mb-2">
+                        <div className="col-2">
+                            <label className="col-form-label">Name</label>
+                        </div>
+                        <div className="col-10">
+                            <input type="text" name="name" className="form-control" value={values.name} onChange={e => setFieldValue('name', e.target.value)}/>
+                            {errors.name && <div className="text-danger">{errors.name}</div>}
+                        </div>
+                    </div>
+                    <div className="row mb-2">
+                        <div className="col-2">
+                            <label className="col-form-label">Age</label>
+                        </div>
+                        <div className="col-10">
+                            <input type="text" name="age" className="form-control" value={values.age} onChange={e => setFieldValue('age', e.target.value)}/>
+                            {errors.age && <div className="text-danger">{errors.age}</div>}
+                        </div>
+                    </div>
+                    <div className="row mb-4">
+                        <div className="col-2">
+                            <label className="col-form-label">Email</label>
+                        </div>
+                        <div className="col-10">
+                            <input type="text" name="email" className="form-control" value={values.email} onChange={e => setFieldValue('email', e.target.value)}/>
+                            {errors.email && <div className="text-danger">{errors.email}</div>}
+                        </div>
+                    </div>
+
+                    <div className="d-flex flex-row-reverse">
+                        <button className="btn btn-danger ms-2" type="button" onClick={() => setFormSearchUserShown(false)}>Hide</button>
+                        <button className="btn btn-warning ms-2" type="button" onClick={() => {
+                            setFieldValue('name', '')
+                            setFieldValue('age', '')
+                            setFieldValue('email', '')
+                            submitForm().then()
+                        }}>Reset
+                        </button>
+                        <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
+                            {!isSubmitting && "Filter"}
+                            {isSubmitting && <span>
+                                Searching <div className="spinner-border spinner-border-sm" role="status">
+                                <span className="visually-hidden">...</span>
+                            </div>
+                            </span>}
+                        </button>
+                    </div>
+                </Form>
+            }}
+
+        </Formik>
+    }
+
+
     return (
         <div className={"container p-4"}>
             <div className="card">
@@ -305,6 +392,7 @@ function App() {
                         <div className="col-6">Users</div>
                         <div className="col-6 d-flex flex-row-reverse">
                             <button className="btn btn-primary ms-2" onClick={() => getUsersQuery.refetch()}>Reload list</button>
+                            <button className="btn btn-primary ms-2" onClick={() => setFormSearchUserShown(true)}>Search among users</button>
                             <button className="btn btn-primary" onClick={() => setIsCreateUserFormShown(true)}>Add user</button>
                         </div>
                     </div>
@@ -317,7 +405,12 @@ function App() {
 
                     {/* Add new user */}
                     {modalFormEdition.isShown && <div className="mb-4">
-                        <FormEditUserInModal/>
+                        <FormUpdateUserInModal/>
+                    </div>}
+
+                    {/* Add new user */}
+                    {formSearchUserShown && <div className="mb-4">
+                        <FormSearchUser/>
                     </div>}
 
                     {/* List of users*/}

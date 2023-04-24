@@ -10,7 +10,7 @@ import { deleteDeckController } from "./controllers/deleteDeckController";
 import { getDeckController } from "./controllers/getDeckController";
 import { createCardForDeckController } from "./controllers/createCardForDeckController";
 import { deleteCardOnDeckController } from "./controllers/deleteCardOnDeckController";
-import {createUserController, deleteUserController, getUsersController} from "./controllers/userController";
+import {createUserController, deleteUserController, getUsersController, updateUserController} from "./controllers/userController";
 
 const PORT = process.env.PORT;
 
@@ -28,6 +28,7 @@ app.use(express.json());
 app.post("/user", createUserController)
 app.get("/user", getUsersController)
 app.delete('/user/:id', deleteUserController)
+app.put('/user/:id', updateUserController)
 
 
 app.get("/decks", getDecksController);
